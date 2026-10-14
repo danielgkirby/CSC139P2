@@ -1,0 +1,4 @@
+PUT small 10
+GET small
+PUT small 4096
+GET small

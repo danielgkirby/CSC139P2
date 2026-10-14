@@ -1,0 +1,3 @@
+*.o
+/cachelab
+/tests/pool_check

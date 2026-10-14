@@ -1,0 +1,14 @@
+# Updating A creates a large early hole while a smaller tail block is free.
+# First-fit and best-fit place the new A, then N, at different locations
+# with a 1024-byte pool.
+PUT A 240
+PUT B 80
+PUT C 160
+PUT D 80
+PUT E 200
+PUT A 100
+PUT C 120
+PUT N 100
+GET A
+GET C
+GET N
