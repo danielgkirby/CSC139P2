@@ -25,8 +25,7 @@ void output_event(event_context_t *ev, const char *fmt, ...) {
 cache_entry_t *evict_fifo_select(cache_t *cache) {
     /* TODO: Return the oldest active entry, or NULL when empty. GET does
      * not change the insertion order. */
-    (void)cache;
-    UNFINISHED("evict_fifo_select");
+    return cache->policy_head;
 }
 
 cache_entry_t *evict_clock_select(cache_t *cache) {
