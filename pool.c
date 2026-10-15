@@ -47,10 +47,10 @@ static block_header_t *first_fit(memory_pool_t *pool, size_t requested) {
     /* TODO: Walk from pool->blocks. Return the first FREE block with payload
      * capacity >= requested, or NULL. The list also contains allocated blocks. */
     for (block_header_t *current = pool -> blocks;
-        current != null;
+        current != NULL;
         current = current -> next){
             if (current -> free && current -> size >= requested)
-                return currrent;
+                return current;
         }
         return NULL;
 }
@@ -62,18 +62,18 @@ static block_header_t *best_fit(memory_pool_t *pool, size_t requested) {
     block_header_t *best = NULL;
     
      for (block_header_t *current = pool -> blocks;
-        current != null;
+        current != NULL;
         current = current -> next){
             //If currentsize == requestedsize
             if (current -> free && 
                 current -> size == requested )
-                return currrent;
+                return current;
             
             // if it fits and best is null, or if it fits and current is better than best
             if (current -> free && 
                 current -> size >= requested &&
-                (current -> size < *best -> size || best == NULL) )
-                best = currrent;
+                (best == NULL || current -> size < best -> size ) )
+                best = current;
         }
         return best;
  
@@ -118,7 +118,7 @@ void *pool_try_alloc(memory_pool_t *pool, size_t requested) {
      * payload. Do not evict here: the cache handler owns that retry loop.
      * The caller already holds the provided cache/output locks. */
 
-    block_header_t *block
+    block_header_t *block;
 
     if (pool->policy == ALLOC_FIRST_FIT)
         block = first_fit(pool, requested);

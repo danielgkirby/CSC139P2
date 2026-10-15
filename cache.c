@@ -38,24 +38,21 @@ cache_entry_t *evict_clock_select(cache_t *cache) {
      * Do not call policy_remove while selecting: evict_one does it later. */
 
     if (cache->clock_hand == NULL)
-        return NULL
+        return NULL;
 
-        while(1){
-            cache_entry_t *canidate = cache->clock_hand;
-            if (canidate->reference_bit){
-                canidate->reference_bit = 0;
-                cache->clock_hand = policy_successor(cache, canidate);
-                continue;
-            }
-
+    while(1){
+        cache_entry_t *canidate = cache->clock_hand;
+        if (canidate->reference_bit){
+            canidate->reference_bit = 0;
             cache->clock_hand = policy_successor(cache, canidate);
-            return canidate;
-
+            continue;
         }
 
+        cache->clock_hand = policy_successor(cache, canidate);
+        return canidate;
 
-    (void)cache;
-    UNFINISHED("evict_clock_select");
+    }
+
 }
 
 /* ---------- Provided transaction: evict one selected active entry ---------- */
@@ -80,10 +77,19 @@ void handle_get(cache_t *cache, request_t *req, event_context_t *ev) {
      * emits HIT; a miss increments misses and emits MISS. GET does not
      * allocate, reorder the policy list or change the clock hand.
      * The provided worker holds cache_lock and output_lock already. */
-    (void)cache;
-    (void)req;
-    (void)ev;
-    UNFINISHED("handle_get");
+    cache_entry_t *entry = index_find(cache, req->key);
+
+    if (entry != NULL) {
+        cache->hits++;
+        entry->reference_bit = 1;
+        output_event(ev, "HIT req=%zu client=%d key=%s",
+                     ev->req_seq, ev->client_id, req->key);
+    } else {
+        cache->misses++;
+        output_event(ev, "MISS req=%zu client=%d key=%s",
+                     ev->req_seq, ev->client_id, req->key);
+    }
+    
 }
 
 /* ---------- Student work: PUT, update and eviction retry ---------- */
@@ -101,9 +107,58 @@ void handle_put(cache_t *cache, request_t *req, event_context_t *ev) {
      * index, append to the policy list, add requested occupancy, emit ALLOC.
      * No malloc of entries and no mutex operations: the worker holds both
      * cache_lock and output_lock throughout this request. */
-    (void)cache;
-    (void)req;
-    (void)ev;
-    (void)evict_one;
-    UNFINISHED("handle_put");
+    
+     output_event(ev, "PUT req=%zu client=%d key=%s size=%zu",
+                 ev->req_seq, ev->client_id, req->key, req->size);
+
+    /* Even an empty pool could not hold this object. */
+    if (req->size > cache->pool.size - HEADER_SIZE) {
+        cache->rejects++;
+        output_event(ev, "REJECT req=%zu client=%d key=%s size=%zu",
+                     ev->req_seq, ev->client_id, req->key, req->size);
+        return;
+    }
+
+    /* Replace an existing entry with this key, if there is one. */
+    cache_entry_t *old = index_find(cache, req->key);
+    if (old != NULL) {
+        output_event(ev, "UPDATE req=%zu client=%d key=%s old_size=%zu new_size=%zu",
+                     ev->req_seq, ev->client_id, req->key,
+                     old->requested_size, req->size);
+
+        index_remove(cache, old);
+        policy_remove(cache, old);
+        cache->occupancy -= old->requested_size;
+        pool_free(&cache->pool, old->payload, ev);
+    }
+
+    /* Evict and retry until a single free block can hold the request. */
+    void *payload = pool_try_alloc(&cache->pool, req->size);
+    while (payload == NULL) {
+        cache_entry_t *victim;
+
+        if (cache->eviction_policy == EVICT_FIFO)
+            victim = evict_fifo_select(cache);
+        else
+            victim = evict_clock_select(cache);
+
+        evict_one(cache, victim, ev);
+        payload = pool_try_alloc(&cache->pool, req->size);
+    }
+
+    /* This PUT request owns a stable metadata slot for its new entry. */
+    cache_entry_t *entry = &req->entry_storage;
+    memset(entry, 0, sizeof(*entry));
+    strcpy(entry->key, req->key);
+    entry->requested_size = req->size;
+    entry->payload = payload;
+    entry->reference_bit = 1;
+
+    index_insert(cache, entry);
+    policy_append(cache, entry);
+    cache->occupancy += req->size;
+
+    output_event(ev, "ALLOC req=%zu client=%d key=%s addr=%zu size=%zu",
+                 ev->req_seq, ev->client_id, entry->key,
+                 pool_offset(&cache->pool, payload), req->size);
 }
