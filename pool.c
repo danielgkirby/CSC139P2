@@ -46,18 +46,37 @@ int pool_init(memory_pool_t *pool, size_t size, alloc_policy_t policy) {
 static block_header_t *first_fit(memory_pool_t *pool, size_t requested) {
     /* TODO: Walk from pool->blocks. Return the first FREE block with payload
      * capacity >= requested, or NULL. The list also contains allocated blocks. */
-    (void)pool;
-    (void)requested;
-    UNFINISHED("first_fit");
+    for (block_header_t *current = pool -> blocks;
+        current != null;
+        current = current -> next){
+            if (current -> free && current -> size >= requested)
+                return currrent;
+        }
+        return NULL;
 }
 
 static block_header_t *best_fit(memory_pool_t *pool, size_t requested) {
     /* TODO: Inspect the entire address-ordered list; choose the smallest
      * sufficient FREE block. On equal capacities keep the earlier address.
      * Return NULL if none fits. */
-    (void)pool;
-    (void)requested;
-    UNFINISHED("best_fit");
+    block_header_t *best = NULL;
+    
+     for (block_header_t *current = pool -> blocks;
+        current != null;
+        current = current -> next){
+            //If currentsize == requestedsize
+            if (current -> free && 
+                current -> size == requested )
+                return currrent;
+            
+            // if it fits and best is null, or if it fits and current is better than best
+            if (current -> free && 
+                current -> size >= requested &&
+                (current -> size < *best -> size || best == NULL) )
+                best = currrent;
+        }
+        return best;
+ 
 }
 
 /* ---------- Student work: carve a second header inside the pool ---------- */
@@ -69,12 +88,26 @@ static void split_if_possible(block_header_t *block, size_t requested) {
      * payload byte). Check the rounded size before subtracting it.
      * Link the new FREE block into the address-ordered list and set both
      * payload capacities. If no valid split fits, leave block->size alone. */
-    (void)block;
-    (void)requested;
-    (void)round_up;
-    (void)payload_from_header;
-    UNFINISHED("split_if_possible");
+    size_t physical = round_up(requested, HEADER_ALIGNMENT);
+
+    //remaining phyisical space is too small for new block
+    if (physical > block->size ||
+        block->size - physical < MIN_BLOCK_SIZE)
+        return;
+
+    //new block header for remaining space after requested block
+    block_header_t *remainder =
+        (block_header_t *)((unsigned char *)payload_from_header(block)
+                           + physical);
+
+    remainder->size = block->size - physical - HEADER_SIZE;
+    remainder->free = 1;
+    remainder->next = block->next;
+
+    block->size = physical;
+    block->next = remainder;
 }
+
 
 /* ---------- Student work: select, split and occupy ---------- */
 
