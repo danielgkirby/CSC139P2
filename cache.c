@@ -36,6 +36,24 @@ cache_entry_t *evict_clock_select(cache_t *cache) {
      * Return NULL for an empty cache. Provided policy_append initializes
      * the hand; policy_remove repairs it if removing the pointed-to entry.
      * Do not call policy_remove while selecting: evict_one does it later. */
+
+    if (cache->clock_hand == NULL)
+        return NULL
+
+        while(1){
+            cache_entry_t *canidate = cache->clock_hand;
+            if (canidate->reference_bit){
+                canidate->reference_bit = 0;
+                cache->clock_hand = policy_successor(cache, canidate);
+                continue;
+            }
+
+            cache->clock_hand = policy_successor(cache, canidate);
+            return canidate;
+
+        }
+
+
     (void)cache;
     UNFINISHED("evict_clock_select");
 }
