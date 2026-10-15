@@ -143,12 +143,46 @@ void pool_free(memory_pool_t *pool, void *payload, event_context_t *ev) {
      * next links. Emit one COALESCE per actual merge via output_event(ev,...)
      * with req/client IDs, surviving payload offset and new payload size.
      * No mutex operations belong here; the worker already holds the locks. */
-    (void)pool;
-    (void)payload;
-    (void)ev;
-    (void)header_from_payload;
-    UNFINISHED("pool_free");
+    
+    if (payload == NULL)
+        return;
+
+    block_header_t *block = header_from_payload(payload);
+    block->free = 1;
+
+    /* Merge with the next block if it is free. */
+    if (block->next != NULL && block->next->free) {
+        block_header_t *next = block->next;
+
+        block->size += HEADER_SIZE + next->size;
+        block->next = next->next;
+
+        output_event(ev, "COALESCE req=%zu client=%d addr=%zu size=%zu",
+                     ev->req_seq, ev->client_id,
+                     pool_offset(pool, payload_from_header(block)),
+                     block->size);
+    }
+
+    /* Find the block immediately before this one. */
+    block_header_t *previous = NULL;
+    for (block_header_t *current = pool->blocks;
+         current != NULL && current != block;
+         current = current->next) {
+        previous = current;
+    }
+
+    /* Merge with that predecessor if it is free. */
+    if (previous != NULL && previous->free) {
+        previous->size += HEADER_SIZE + block->size;
+        previous->next = block->next;
+
+        output_event(ev, "COALESCE req=%zu client=%d addr=%zu size=%zu",
+                     ev->req_seq, ev->client_id,
+                     pool_offset(pool, payload_from_header(previous)),
+                     previous->size);
+    }
 }
+    
 
 /* ---------- Provided inspection and teardown ---------- */
 
