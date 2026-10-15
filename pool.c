@@ -117,12 +117,20 @@ void *pool_try_alloc(memory_pool_t *pool, size_t requested) {
      * split if possible, mark the selected block allocated and return its
      * payload. Do not evict here: the cache handler owns that retry loop.
      * The caller already holds the provided cache/output locks. */
-    (void)pool;
-    (void)requested;
-    (void)first_fit;
-    (void)best_fit;
-    (void)split_if_possible;
-    UNFINISHED("pool_try_alloc");
+
+    block_header_t *block
+
+    if (pool->policy == ALLOC_FIRST_FIT)
+        block = first_fit(pool, requested);
+    else
+        block = best_fit(pool, requested);
+
+    if (block == NULL)
+        return NULL;
+
+    split_if_possible(block, requested);
+    block->free = 0;
+    return payload_from_header(block);
 }
 
 /* ---------- Student work: free and coalesce ---------- */
