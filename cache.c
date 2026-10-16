@@ -89,7 +89,7 @@ void handle_get(cache_t *cache, request_t *req, event_context_t *ev) {
         output_event(ev, "MISS req=%zu client=%d key=%s",
                      ev->req_seq, ev->client_id, req->key);
     }
-    
+
 }
 
 /* ---------- Student work: PUT, update and eviction retry ---------- */
@@ -108,7 +108,7 @@ void handle_put(cache_t *cache, request_t *req, event_context_t *ev) {
      * No malloc of entries and no mutex operations: the worker holds both
      * cache_lock and output_lock throughout this request. */
     
-     output_event(ev, "PUT req=%zu client=%d key=%s size=%zu",
+    output_event(ev, "PUT req=%zu client=%d key=%s size=%zu",
                  ev->req_seq, ev->client_id, req->key, req->size);
 
     /* Even an empty pool could not hold this object. */
